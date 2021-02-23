@@ -1,0 +1,16 @@
+Dataset:
+  train_data_path: "temp.json"
+  val_data_path: ""
+  image_size: [448, 288]
+  channels: 3
+Train:
+  batch_size: 1
+  epochs: 10
+  optimizer: "adam"
+  learning_rate: 0.001
+  pretrained: ""
+  device: 0
+  architecture: "resnet50"
+Logging:
+  tb_logdir: "logs"
+  ckpt_dir: ""

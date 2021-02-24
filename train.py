@@ -30,7 +30,7 @@ class Trainer(object):
         # self.writer = get_tb_writer(config["Logging"]["tb_logdir"])
 
     def get_model(self, architecture):
-        return ResNet50Encoder(self.channels).cuda(self.device)
+        return ResNet50Encoder(self.input_shape, self.channels).cuda(self.device)
 
     def get_optimizer(self, opt, lr=0.001):
         """

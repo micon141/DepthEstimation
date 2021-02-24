@@ -108,13 +108,15 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         x1 = F.relu(self.bn1(self.conv1(x)))
-        #x = F.max_pool2d(x, 3, 2)
+        x1 = F.max_pool2d(x1, 3, 2)
         x2 = self.block2(x1)
         x3 = self.block3(x2)
         x4 = self.block4(x3)
         x5 = self.block5(x4)
+        x5 = F.avg_pool2d(x5, 1, 4)
 
-        x6 = self.upoconv7(x5)
+        print(f"#######################\nshape: {x5.shape}")
+        x6 = self.upconv7(x5)
         return x5
 
 
@@ -130,7 +132,7 @@ class ResNet50Encoder(ResNet):
 
         ## Decoder
         downscaling_factor = 16
-        dim = (input_shape[0] / downscaling_factor, input_shape[1] / downscaling_factor)
-        self.upconv7 = UpsampleNN(512, 512, 2, 3, dim * 2)
+        dim = (input_shape[0] // downscaling_factor, input_shape[1] // downscaling_factor)
+        #self.upconv7 = UpsampleNN(512, 512, 2, 3, dim * 2)
 
 

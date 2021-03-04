@@ -19,6 +19,7 @@ class Trainer(object):
         self.train_loader = create_dataloaders(config["Dataset"]["train_data_path"],
                                                config["Dataset"]["image_size"],
                                                config["Train"]["batch_size"],
+                                               config["Train"]["augmentation"],
                                                self.logger)
         self.batch_size = config["Train"]["batch_size"]
         self.epochs = config["Train"]["epochs"]

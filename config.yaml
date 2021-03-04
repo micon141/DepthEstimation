@@ -1,6 +1,6 @@
 Dataset:
-  train_data_path: ""
-  image_size: [384, 256]
+  train_data_path: "../json_files/50images.json"
+  image_size: [512, 384]
   channels: 3
 Train:
   batch_size: 4
@@ -10,6 +10,17 @@ Train:
   pretrained: ""
   device: 0
   architecture: "resnet50"
+  augmentation:
+    HorizonalFlip:
+      p: 0.5
+    RandomBrightness:
+      p: 1
+      low_value: 0.6
+      high_value: 1.2
+    RandomGamma:
+      p: 1
+      low_value: 0.9
+      high_value: 1.1
 Logging:
   tb_logdir: "logs"
   ckpt_dir: ""

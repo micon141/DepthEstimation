@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from utils.utils import get_logger, get_tb_writer, get_device
 from dataset import create_dataloaders
-from model import ResNet50Encoder
+from model import ResNet50Encoder, ResNet101Encoder, ResNet152Encoder, ResNet34Encoder
 
 
 class Trainer(object):
@@ -30,7 +30,17 @@ class Trainer(object):
         # self.writer = get_tb_writer(config["Logging"]["tb_logdir"])
 
     def get_model(self, architecture):
-        return ResNet50Encoder(self.input_shape, self.channels).cuda(self.device)
+        if architecture == "resnet50":
+            return ResNet50Encoder(self.input_shape, self.channels).cuda(self.device)
+        elif architecture == "resnet101":
+            return ResNet101Encoder(self.input_shape, self.channels).cuda(self.device)
+        elif architecture == "resnet152":
+            return ResNet152Encoder(self.input_shape, self.channels).cuda(self.device)
+        elif architecture == "resnet34":
+            return ResNet34Encoder(self.input_shape, self.channels).cuda(self.device)
+        else:
+            raise NotImplementedError(f"Architecture {architecture} is not implemented. "
+                                      f"See documentation for supported architectures")
 
     def get_optimizer(self, opt, lr=0.001):
         """
@@ -68,8 +78,7 @@ class Trainer(object):
                 image_right = (image_right.type(torch.FloatTensor)).cuda(self.device)
 
                 pred = self.model(image_left)
-
-
+                exit(1)
 
 if __name__ == "__main__":
 

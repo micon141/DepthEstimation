@@ -4,6 +4,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import torch
 
+
 def get_data(data_path):
     with open(data_path, 'r') as f:
         data = json.load(f)

@@ -1,10 +1,9 @@
 Dataset:
-  train_data_path: "./temp/data/50images.json"
-  val_data_path: ""
-  image_size: [512, 384]
+  train_data_path: ""
+  image_size: [384, 256]
   channels: 3
 Train:
-  batch_size: 1
+  batch_size: 4
   epochs: 10
   optimizer: "adam"
   learning_rate: 0.001

@@ -39,8 +39,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--images_path", type=str, default='',
                         help="Path to images")
-    parser.add_argument("--out_json", type=str, default='',
-                        help="Path to output json file or output directory for more than one file")
+    parser.add_argument("--train_json", type=str, default='',
+                        help="Path to output json file - train data")
+    parser.add_argument("--val_json", type=str, default='',
+                        help="Path to output json file - validation data")
+    parser.add_argument("--test_json", type=str, default='',
+                        help="Path to output json file - test data")
     parser.add_argument("--split_percentages", type=str, default="75:25",
                         help="Split percentages in the form <train_percentage> "
                              "or <train_percentage>:<val_percentage> or"
@@ -65,21 +69,31 @@ if __name__ == "__main__":
     splits = get_split(image_pairs, args.split_percentages)
 
     if len(splits) == 1:
-        with open(args.out_json, 'w') as outfile:
+        with open(args.train_json, 'w') as outfile:
             json.dump(splits[0], outfile, indent=2)
     else:
-        if not os.path.isdir(args.out_json):
-            os.mkdir(args.out_json)
         for num, split in enumerate(splits):
             if num == 0:
-                train_file = os.path.join(args.out_json, "train.json")
-                with open(train_file, 'w') as outfile:
-                    json.dump(split, outfile, indent=2)
+                if os.path.exists(args.train_json):
+                    train_file = os.path.join(args.train_json)
+                    with open(train_file, 'w') as outfile:
+                        json.dump(split, outfile, indent=2)
+                else:
+                    print("ERROR: Not provided output json file for train data")
+                    exit()
             elif num == 1:
-                val_file = os.path.join(args.out_json, "val.json")
-                with open(val_file, 'w') as outfile:
-                    json.dump(split, outfile, indent=2)
+                if os.path.exists(args.val_json):
+                    val_file = os.path.join(args.val_json)
+                    with open(val_file, 'w') as outfile:
+                        json.dump(split, outfile, indent=2)
+                else:
+                    print("ERROR: Not provided output json file for val data")
+                    exit()
             else:
-                test_file = os.path.join(args.out_json, "test.json")
-                with open(test_file, 'w') as outfile:
-                    json.dump(split, outfile, indent=2)
+                if os.path.exists(args.test_json):
+                    test_file = os.path.join(args.test_json)
+                    with open(test_file, 'w') as outfile:
+                        json.dump(split, outfile, indent=2)
+                else:
+                    print("ERROR: Not provided output json file for test data")
+                    exit()

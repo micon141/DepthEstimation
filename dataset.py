@@ -5,6 +5,8 @@ import random
 from torch.utils.data import Dataset, DataLoader
 import torch
 
+from utils.utils import scale_image
+
 
 def get_data(data_path):
     with open(data_path, 'r') as f:
@@ -68,18 +70,17 @@ class DatasetBuilder(Dataset):
             image_left, image_right = self.read_images(item)
             if self.augment:
                 image_left, image_right = self.augment_image(image_left, image_right)
-            image_left = self.preprocess_image(image_left)
-            image_right = self.preprocess_image(image_right)
+            images_left = self.preprocess_image(image_left)
+            images_right = self.preprocess_image(image_right)
         except:
             self.logger.info(f"Can not read images: {self.data[item]}")
             raise
-        return image_left, image_right
+        return images_left, images_right
 
     def read_images(self, item):
         images_path = self.data[item]
         image_left = cv.imread(images_path[0])
         image_right = cv.imread(images_path[1])
-
         return image_left, image_right
 
     def augment_image(self, image_left, image_right):
@@ -90,16 +91,17 @@ class DatasetBuilder(Dataset):
                                                    (image_left, image_right)
         image_left, image_right = RandomGamma(p=self.augment["RandomGamma"]["p"],
                                               low_value=self.augment["RandomGamma"]["low_value"],
-                                              high_value=self.augment["RandomGamma"]["high_value"])\
+                                              high_value=self.augment["RandomGamma"]["high_value"]) \
                                               (image_left, image_right)
         return image_left, image_right
 
     def preprocess_image(self, image):
         image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
         image = cv.resize(image, (self.image_size[0], self.image_size[1]))
-        image = np.transpose(image, (2, 0, 1))
-        image = image / 255.
-        return image
+        images_scaled = scale_image(image)
+        images_normalized = [img_scaled / 255. for img_scaled in images_scaled]
+        images_normalized = [np.transpose(img_norm, (2, 0, 1)) for img_norm in images_normalized]
+        return images_normalized
 
 
 def create_dataloaders(data_path, image_size, batch_size, augment, logger):

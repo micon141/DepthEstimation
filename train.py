@@ -8,6 +8,7 @@ import torch.nn as nn
 from utils.utils import get_logger, get_tb_writer, get_device
 from dataset import create_dataloaders
 from model import ResNet50Encoder, ResNet101Encoder, ResNet152Encoder, ResNet34Encoder
+from loss import MonoDepthLoss
 
 
 class Trainer(object):
@@ -27,6 +28,7 @@ class Trainer(object):
         self.model = self.get_model(config["Train"]["architecture"])
         self.optimizer = self.get_optimizer(config["Train"]["optimizer"],
                                             config["Train"]["learning_rate"])
+        self.criterion = MonoDepthLoss(self.device)
         self.checkpoints_dir = config["Logging"]["ckpt_dir"]
         # self.writer = get_tb_writer(config["Logging"]["tb_logdir"])
 
@@ -61,7 +63,9 @@ class Trainer(object):
                                       f"For supported optimizers see documentation")
         return optimizer
 
+
     def train(self):
+        #torch.autograd.set_detect_anomaly(True)
         params = [p.numel() for p in self.model.parameters() if p.requires_grad]
         total_num_params = 0
         for p in params:
@@ -73,13 +77,29 @@ class Trainer(object):
         self.logger.info(f"---------------- Training Started ----------------")
         for epoch in range(self.epochs):
             epoch += 1
-            for batch, (image_left, image_right) in enumerate(self.train_loader):
+            for batch, (images_left, images_right) in enumerate(self.train_loader):
                 batch += 1
-                image_left = (image_left.type(torch.FloatTensor)).cuda(self.device)
-                image_right = (image_right.type(torch.FloatTensor)).cuda(self.device)
 
-                pred = self.model(image_left)
-                exit(1)
+                images_left = [image.type(torch.FloatTensor).cuda(self.device) for image in images_left]
+                images_right = [image.type(torch.FloatTensor).cuda(self.device) for image in images_right]
+
+                image_left_train = images_left[-1]
+                disparities = self.model(image_left_train)
+
+                train_loss = self.criterion(images_left, images_right, disparities, self.device)
+                train_loss_total = torch.mean(train_loss)
+
+                if global_step % 10 == 0:
+                    print("loss: ", train_loss)
+                    print("total_loss: ", train_loss_total)
+                self.optimizer.zero_grad()
+                train_loss_total.backward(retain_graph=True)
+                self.optimizer.step()
+
+
+                global_step += 1
+                
+
 
 if __name__ == "__main__":
 

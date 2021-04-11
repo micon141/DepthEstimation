@@ -1,3 +1,4 @@
+import cv2 as cv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -94,7 +95,13 @@ class UpsampleNN(nn.Module):
         return F.elu(x)
 
 
-class ResNetDecoder(nn.Module):
+class MonoDepth(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+
+class ResNetDecoder(MonoDepth):
 
     def __init__(self, scale=(2, 2)):
         super().__init__()
@@ -193,7 +200,7 @@ class ResNetDecoder(nn.Module):
         disp1 =self.disp1(i1)
         print(f"disp1.shape   = {disp1.shape}")
 
-        return disp1
+        return [disp4, disp3, disp2, disp1]
 
 
 class ResNet34Encoder(ResNetDecoder):

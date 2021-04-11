@@ -1,6 +1,6 @@
 Dataset:
   train_data_path: "../json_files/50images.json"
-  image_size: [512, 384]
+  image_size: [512, 256]
   channels: 3
 Train:
   batch_size: 4

@@ -5,13 +5,19 @@ import random
 from torch.utils.data import Dataset, DataLoader
 import torch
 
-from utils.utils import scale_image
-
 
 def get_data(data_path):
     with open(data_path, 'r') as f:
         data = json.load(f)
     return data
+
+
+def preprocess_image(image, image_size):
+    image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
+    image = cv.resize(image, (image_size[0], image_size[1]))
+    images_normalized = image / 255.
+    images_normalized = np.transpose(images_normalized, (2, 0, 1))
+    return images_normalized
 
 
 class RandomHorizontalFlip(object):
@@ -70,8 +76,8 @@ class DatasetBuilder(Dataset):
             image_left, image_right = self.read_images(item)
             if self.augment:
                 image_left, image_right = self.augment_image(image_left, image_right)
-            images_left = self.preprocess_image(image_left)
-            images_right = self.preprocess_image(image_right)
+            images_left = preprocess_image(image_left, self.image_size)
+            images_right = preprocess_image(image_right, self.image_size)
         except:
             self.logger.info(f"Can not read images: {self.data[item]}")
             raise
@@ -94,14 +100,6 @@ class DatasetBuilder(Dataset):
                                               high_value=self.augment["RandomGamma"]["high_value"]) \
                                               (image_left, image_right)
         return image_left, image_right
-
-    def preprocess_image(self, image):
-        image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
-        image = cv.resize(image, (self.image_size[0], self.image_size[1]))
-        images_scaled = scale_image(image)
-        images_normalized = [img_scaled / 255. for img_scaled in images_scaled]
-        images_normalized = [np.transpose(img_norm, (2, 0, 1)) for img_norm in images_normalized]
-        return images_normalized
 
 
 def create_dataloaders(data_path, image_size, batch_size, augment, logger):

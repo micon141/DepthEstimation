@@ -7,6 +7,9 @@ import numpy as np
 
 
 def get_logger():
+    """
+    :return: logger
+    """
     logger = logging.getLogger("Depth Estimation Inspired by Monodepth")
     logger.setLevel(logging.DEBUG)
     console_handler = logging.StreamHandler()
@@ -18,10 +21,8 @@ def get_logger():
 
 def get_tb_writer(tb_logdir):
     """
-    Args:
-        tb_logdir: str, Path to directory fot tensorboard events
-    Return:
-        writer: TensorBoard writer
+    :param tb_logdir: Path to directory for tensorboard events
+    :return: TensorBoard writer
     """
     if os.path.isdir(tb_logdir):
         rmtree(tb_logdir)
@@ -32,11 +33,9 @@ def get_tb_writer(tb_logdir):
 
 def get_device(device):
     """
-    Args:
-        device: str, GPU device id
-    Return: torch device
+    :param device: GPU device id
+    :return: PyTorch device
     """
-
     if device == "cpu":
         return torch.device("cpu")
     else:
@@ -47,15 +46,3 @@ def get_device(device):
         print(f"device{device} _CudaDeviceProperties(name='{x.name}'"
               f", total_memory={x.total_memory / c}MB)")
         return torch.device("cuda:0")
-
-
-def get_depth_from_disparity(disparities):
-    disp = disparities
-    (_, h, w) = disp.shape
-    l_disp = disp[0, :, :]
-    r_disp = np.fliplr(disp[1, :, :])
-    m_disp = 0.5 * (l_disp + r_disp)
-    (l, _) = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h))
-    l_mask = 1.0 - np.clip(20 * (l - 0.05), 0, 1)
-    r_mask = np.fliplr(l_mask)
-    return r_mask * l_disp + l_mask * r_disp + (1.0 - l_mask - r_mask) * m_disp

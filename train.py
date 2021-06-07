@@ -3,6 +3,9 @@ import argparse
 import yaml
 from tqdm import tqdm
 import torch
+import numpy as np
+import cv2 as cv
+
 
 from utils import get_logger, get_tb_writer, get_device
 from dataset import create_dataloaders
@@ -10,9 +13,13 @@ from model import ResNet50Encoder, ResNet101Encoder, ResNet152Encoder, ResNet34E
 from loss import MonoDepthLoss
 from lr_schedulers import StepDecayLR
 
+
 class Trainer(object):
 
     def __init__(self, config):
+        """
+        :param config: Train configuration
+        """
         self.config = config
         self.logger = get_logger()
         self.input_shape = config["Dataset"]["image_size"]
@@ -38,11 +45,18 @@ class Trainer(object):
         self.optimizer = self.get_optimizer(config["Train"]["optimizer"],
                                             config["Train"]["lr_scheduler"]["lr_init"])
         self.lr_scheduler = self.get_scheduler(config["Train"]["lr_scheduler"])
-        self.criterion = MonoDepthLoss(self.device)
+        self.criterion = MonoDepthLoss()
+        self.appearance_matching_loss_weight = config["Loss"]["appearance_matching_loss_weight"]
+        self.smoothness_loss_weight = config["Loss"]["smoothness_loss_weight"]
+        self.lr_consistency_loss_weight = config["Loss"]["lr_consistency_loss_weight"]
         self.checkpoints_dir = config["Logging"]["ckpt_dir"]
         self.writer = get_tb_writer(config["Logging"]["tb_logdir"])
 
     def get_model(self, architecture):
+        """
+        :param architecture: Network architecture from config file
+        :return: Created architecture
+        """
         if architecture == "resnet50":
             return ResNet50Encoder(self.input_shape, self.channels).cuda(self.device)
         elif architecture == "resnet101":
@@ -56,7 +70,11 @@ class Trainer(object):
                                       f"See documentation for supported architectures")
 
     def load_model(self, arch, pretrained):
-
+        """
+        :param arch: Network architecture from config file
+        :param pretrained: Path to the pretrained model
+        :return: Loaded model
+        """
         model = self.get_model(arch)
         self.logger.info(f"Loading weights from {pretrained}...")
         model.load_state_dict(torch.load(pretrained))
@@ -65,9 +83,10 @@ class Trainer(object):
         return model.cuda(self.device)
 
     def save_model(self, epoch, step):
-        """ Save model
-        Args:
-            step: Number of steps
+        """
+        :param epoch: Number of epoch
+        :param step: Number of step
+        :return:
         """
         if not os.path.isdir(self.checkpoints_dir):
             os.makedirs(self.checkpoints_dir)
@@ -77,12 +96,9 @@ class Trainer(object):
 
     def get_optimizer(self, opt, lr=0.001):
         """
-        Args
-            opt: string, optimizer from config file
-            model: nn.Module, generated model
-            lr: float, specified learning rate
-        Returns:
-            optimizer
+        :param opt: Optimizer from config file
+        :param lr: Specified learning rate
+        :return: Created optimizer
         """
         if opt.lower() == "adam":
             optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
@@ -94,6 +110,10 @@ class Trainer(object):
         return optimizer
 
     def get_scheduler(self, lr_scheduler_dict):
+        """
+        :param lr_scheduler_dict: Scheduler dict from conifg file
+        :return: Created lr_scheduler or None if not specified
+        """
         lr_init = lr_scheduler_dict["lr_init"]
         if lr_scheduler_dict["StepDecay"]["use"]:
             lr_scheduler = StepDecayLR(optimizer=self.optimizer,
@@ -104,11 +124,18 @@ class Trainer(object):
         else:
             return None
 
-    def train(self):
+    def get_params_num(self):
+        """
+        :return: Total number of trainable parameters
+        """
         params = [p.numel() for p in self.model.parameters() if p.requires_grad]
         total_num_params = 0
         for p in params:
             total_num_params += p
+        return total_num_params
+
+    def train(self):
+        total_num_params = self.get_params_num
         self.logger.info(f"Number of parameters: {total_num_params}")
 
         global_step = 0
@@ -121,8 +148,11 @@ class Trainer(object):
                 image_right = image_right.type(torch.FloatTensor).cuda(self.device)
                 disparities = self.model(image_left)
 
-                train_loss = self.criterion(image_left, image_right, disparities)
-                train_loss_total = torch.mean(train_loss)
+                train_loss = self.criterion(disparities, image_left, image_right,
+                                            self.appearance_matching_loss_weight,
+                                            self.smoothness_loss_weight,
+                                            self.lr_consistency_loss_weight)
+                train_loss_total = sum(train_loss)
 
                 self.optimizer.zero_grad()
                 train_loss_total.backward()
@@ -131,30 +161,43 @@ class Trainer(object):
 
                 self.writer.add_scalar("Train.appearance_matching_loss", train_loss[0].item(),
                                        global_step)
-                self.writer.add_scalar("Train.smoothness_loss", train_loss[2].item(),
+                self.writer.add_scalar("Train.smoothness_loss", train_loss[1].item(),
                                        global_step)
                 self.writer.add_scalar("Train.left_right_disparity_consistency_loss", train_loss[2].item(),
                                        global_step)
                 self.writer.add_scalar("Train.total_loss", train_loss_total.item(),
                                        global_step)
+                self.writer.add_scalar("learning_rate", self.optimizer.param_groups[0]["lr"], global_step)
 
+                # Validate and save model
                 if global_step % (batches // self.config["Train"]["evals_per_epoch"]) == 0:
                     self.save_model(epoch, global_step)
                     self.logger.info("Evaluating model...")
+                    val_loss_list = [[], [], [], []]
                     for image_left, image_right in tqdm(self.val_loader):
                         image_left = image_left.type(torch.FloatTensor).cuda(self.device)
                         image_right = image_right.type(torch.FloatTensor).cuda(self.device)
                         val_disparities = self.model(image_left)
-                        val_loss = self.criterion(image_left, image_right, val_disparities)
-                        val_loss_total = torch.mean(val_loss)
-                        self.writer.add_scalar("Val.appearance_matching_loss", val_loss[0].item(),
-                                               global_step)
-                        self.writer.add_scalar("Val.smoothness_loss", val_loss[2].item(),
-                                               global_step)
-                        self.writer.add_scalar("Val.left_right_disparity_consistency_loss", val_loss[2].item(),
-                                               global_step)
-                        self.writer.add_scalar("Val.total_loss", val_loss_total.item(),
-                                               global_step)
+
+                        val_loss = self.criterion(val_disparities, image_left, image_right,
+                                                  self.appearance_matching_loss_weight,
+                                                  self.smoothness_loss_weight,
+                                                  self.lr_consistency_loss_weight)
+
+                        val_loss_total = sum(val_loss)
+                        val_loss_list[0].append(val_loss[0].item())
+                        val_loss_list[1].append(val_loss[1].item())
+                        val_loss_list[2].append(val_loss[2].item())
+                        val_loss_list[3].append(val_loss_total.item())
+                    self.writer.add_scalar("Val.appearance_matching_loss", np.mean(val_loss_list[0]),
+                                           global_step)
+                    self.writer.add_scalar("Val.smoothness_loss", np.mean(val_loss_list[1]),
+                                           global_step)
+                    self.writer.add_scalar("Val.left_right_disparity_consistency_loss", np.mean(val_loss_list[2]),
+                                           global_step)
+                    self.writer.add_scalar("Val.total_loss", np.mean(val_loss_list[3]),
+                                           global_step)
+
             if self.lr_scheduler:
                 self.lr_scheduler.step(epoch)
 

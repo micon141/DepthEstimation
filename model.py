@@ -81,24 +81,43 @@ class Disp(nn.Module):
         super().__init__()
         self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
                               stride=stride, padding=get_padd(kernel_size))
+        self.batch_norm = nn.BatchNorm2d(out_channels)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        x1 = self.conv(x)
-        return 0.3 * self.sigmoid(x1)
+        x = self.conv(x)
+        x = self.batch_norm(x)
+        return 0.3 * self.sigmoid(x)
+
+
+class ConvLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
+        super(ConvLayer, self).__init__()
+        self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,
+                              kernel_size=kernel_size, stride=stride, padding=padding)
+        self.batch_norm = nn.BatchNorm2d(out_channels)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.batch_norm(x)
+        x = F.elu(x)
+        return x
 
 
 class UpsampleNN(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, conv_stride, scale, mode="nearest"):
-        super().__init__()
-        self.upsample = nn.Upsample(scale_factor=scale, mode=mode)
+    def __init__(self, in_channels, out_channels, kernel_size, conv_stride, scale, mode="bilinear"):
+        super(UpsampleNN, self).__init__()
+        self.scale = scale
+        self.mode = mode
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size,
                               conv_stride, padding=get_padd(kernel_size))
+        self.batch_norm = nn.BatchNorm2d(out_channels)
 
     def forward(self, x):
-        x = self.upsample(x)
+        x = nn.functional.interpolate(x, scale_factor=self.scale, mode=self.mode, align_corners=True)
         x = self.conv(x)
-        return F.elu(x)
+        x = self.batch_norm(x)
+        return F.elu(x, inplace=True)
 
 
 class ResNetDecoder(MonoDepth):
@@ -107,29 +126,29 @@ class ResNetDecoder(MonoDepth):
         super().__init__()
         # Decoder
         self.upconv6 = UpsampleNN(in_channels=1024, out_channels=512, kernel_size=3, conv_stride=1, scale=scale)
-        self.iconv6 = nn.Conv2d(in_channels=1024, out_channels=512, kernel_size=3, stride=1, padding=get_padd(3))
+        self.iconv6 = ConvLayer(in_channels=1024, out_channels=512, kernel_size=3, stride=1, padding=get_padd(3))
         self.upconv5 = UpsampleNN(in_channels=512, out_channels=256, kernel_size=3, conv_stride=1, scale=scale)
-        self.iconv5 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, stride=1, padding=get_padd(3))
+        self.iconv5 = ConvLayer(in_channels=512, out_channels=256, kernel_size=3, stride=1, padding=get_padd(3))
         self.upconv4 = UpsampleNN(in_channels=256, out_channels=128, kernel_size=3, conv_stride=1, scale=scale)
-        self.iconv4 = nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, stride=1, padding=get_padd(3))
+        self.iconv4 = ConvLayer(in_channels=256, out_channels=128, kernel_size=3, stride=1, padding=get_padd(3))
 
         self.disp4 = Disp(in_channels=128, out_channels=2, kernel_size=3, stride=1)
         self.udisp4 = nn.Upsample(scale_factor=scale, mode="nearest")
 
         self.upconv3 = UpsampleNN(in_channels=128, out_channels=64, kernel_size=3, conv_stride=1, scale=scale)
-        self.iconv3 = nn.Conv2d(in_channels=130, out_channels=64, kernel_size=3, stride=1, padding=get_padd(3))
+        self.iconv3 = ConvLayer(in_channels=130, out_channels=64, kernel_size=3, stride=1, padding=get_padd(3))
 
         self.disp3 = Disp(in_channels=64, out_channels=2, kernel_size=3, stride=1)
         self.udisp3 = nn.Upsample(scale_factor=scale, mode="nearest")
 
         self.upconv2 = UpsampleNN(in_channels=64, out_channels=32, kernel_size=3, conv_stride=1, scale=scale)
-        self.iconv2 = nn.Conv2d(in_channels=98, out_channels=32, kernel_size=3, stride=1, padding=get_padd(3))
+        self.iconv2 = ConvLayer(in_channels=98, out_channels=32, kernel_size=3, stride=1, padding=get_padd(3))
 
         self.disp2 = Disp(in_channels=32, out_channels=2, kernel_size=3, stride=1)
         self.udisp2 = nn.Upsample(scale_factor=scale, mode="nearest")
 
         self.upconv1 = UpsampleNN(in_channels=32, out_channels=16, kernel_size=3, conv_stride=1, scale=scale)
-        self.iconv1 = nn.Conv2d(in_channels=18, out_channels=16, kernel_size=3, stride=1, padding=get_padd(3))
+        self.iconv1 = ConvLayer(in_channels=18, out_channels=16, kernel_size=3, stride=1, padding=get_padd(3))
 
         self.disp1 = Disp(in_channels=16, out_channels=2, kernel_size=3, stride=1)
 
@@ -153,12 +172,12 @@ class ResNetDecoder(MonoDepth):
 
     def forward(self, x):
 
-        conv1b = F.relu(self.bn1(self.conv1(x)))  # conv1b
-        conv2b = F.max_pool2d(conv1b, 2, 2)  # conv2b
-        conv3b = self.block2(conv2b)  # conv3b
-        conv4b = self.block3(conv3b)  # conv4b
-        conv5b = self.block4(conv4b)  # conv5b
-        conv6b = self.block5(conv5b)  # conv6b
+        conv1b = F.relu(self.bn1(self.conv1(x)))
+        conv2b = F.max_pool2d(conv1b, 2, 2)
+        conv3b = self.block2(conv2b)
+        conv4b = self.block3(conv3b)
+        conv5b = self.block4(conv4b)
+        conv6b = self.block5(conv5b)
         up6 = self.upconv6(conv6b)
         i6 = self.iconv6(torch.cat((conv5b, up6), dim=1))
         up5 = self.upconv5(i6)

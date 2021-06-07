@@ -52,11 +52,15 @@ represents probability of using that augmentation method
 Metrics are monitored during training using tensorboard. To run tensorboard go to the directory where are logs and run 
 ```tensorboard --logdir .```. Then in the browser type ip address and port in the format ```123.456.78:6006```.
 If not specified default port is 6006.
+
+Training and validation splits are provided in the data folder.
+
 ## Inference
 To evaluate model on the videos or on the images run ```python inference.py``` with the following arguments:
 ```
 --source 
-    Path to images or video
+    Path to images. If json file is provided - calculate metrics. If directory is provided the output can be video 
+or images with predictions
 --architecture
     Model architecture that is used during training
 --model_path 
@@ -65,5 +69,30 @@ To evaluate model on the videos or on the images run ```python inference.py``` w
     GPU id
 --image_size 
     Input size of the network in the format WxH
+--min-depth
+    Minimum value for depth. Default: 0.001
+--max-depth
+    Maximum value for depth. Default: 80
 ```
 ## Results
+Metrics that are presented is metrics from the paper: https://arxiv.org/pdf/1406.2283.pdf. The table below shows results.
+<br/>
+
+| metric                       | value  |
+| :--------------------------- | :----- |
+| Absolute Relative Difference | 0.101  |
+| Squared Relative Difference  | 1.132  |
+| RMSE (linear)                | 5.884  |
+| RMSE (log)                   | 0.213  |
+| RMSE (scale-invariant) - D1  | 24.877 |
+| ∂ < 1.25                     | 0.86   |
+| ∂ < 1.25 <sup>2</sup>        | 0.933  |
+| ∂ < 1.25 <sup>3</sup>        | 0.954  |
+
+Those metrics are obtained with resnet50 netowrk as a decoder.
+
+<br/>
+
+Images below are examples from the dataset with predictions.
+
+![Example from KITI dataset](./data/nine_imgs_conc.png)

@@ -101,7 +101,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=str, default='',
-                        help="Path to images or video")
+                        help="Path to images. If json file is provided - calculate metrics. "
+                             "If directory is provided the output can be video or images "
+                             "with predictions")
     parser.add_argument("--architecture", type=str, default='',
                         help="Model architecture that is used during training")
     parser.add_argument("--model_path", type=str, default='',
@@ -112,8 +114,10 @@ if __name__ == "__main__":
                         help="Input size of the network in the format WxH")
     parser.add_argument("--output", type=str, default='',
                         help="Directory for storing images or output video file")
-    parser.add_argument("--min-depth", type=float, default=0.001)
-    parser.add_argument("--max-depth", type=float, default=80)
+    parser.add_argument("--min-depth", type=float, default=0.001,
+                        help="Minimum value for depth. Default: 0.001")
+    parser.add_argument("--max-depth", type=float, default=80,
+                        help="Maximum value for depth. Default: 80")
     args = parser.parse_args()
 
     image_size = [int(args.image_size.split('x')[0]), int(args.image_size.split('x')[1])]

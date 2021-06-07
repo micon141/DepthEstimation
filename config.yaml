@@ -1,12 +1,12 @@
 Dataset:
-  train_data_path: "../json_files/new_train.json"
-  val_data_path: "../json_files/new_val.json"
-  image_size: [1024, 320]
+  train_data_path: "./data/train.json"
+  val_data_path: "./data/val.json"
+  image_size: [512, 256]
   channels: 3
 Train:
   batch_size: 2
   epochs: 50
-  evals_per_epoch: 2
+  evals_per_epoch: 8
   optimizer: "adam"
   lr_scheduler:
     lr_init: 0.0001
@@ -21,11 +21,11 @@ Train:
     HorizonalFlip:
       p: 0.5
     RandomBrightness:
-      p: 0.0
+      p: 0.5
       low_value: 0.6
       high_value: 1.2
     RandomGamma:
-      p: 0.0
+      p: 0.5
       low_value: 0.9
       high_value: 1.1
 Loss:
@@ -33,5 +33,5 @@ Loss:
   smoothness_loss_weight: 1.0
   lr_consistency_loss_weight: 1.0
 Logging:
-  tb_logdir: "/home/milojkon/Datasets/depth/train_logs/27_05_2021_1024_320/logs"
-  ckpt_dir: "/home/milojkon/Datasets/depth/train_logs/27_05_2021_1024_320/checkpoints"
+  tb_logdir: "~/Datasets/depth/train_logs/07_06_2021_512_256/logs"
+  ckpt_dir: "~/Datasets/depth/train_logs/07_06_2021_512_256/checkpoints"

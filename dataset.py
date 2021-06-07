@@ -1,18 +1,28 @@
-import json
+import torch
 import cv2 as cv
 import numpy as np
 import random
+import json
+
 from torch.utils.data import Dataset, DataLoader
-import torch
 
 
 def get_data(data_path):
+    """
+    :param data_path: json file
+    :return: data
+    """
     with open(data_path, 'r') as f:
         data = json.load(f)
     return data
 
 
 def preprocess_image(image, image_size):
+    """
+    :param image: Raw image that have to be preprocessed in order to run training or inference
+    :param image_size: Input size of the network
+    :return: images_normalized: Preprocessed image
+    """
     image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
     image = cv.resize(image, (image_size[0], image_size[1]))
     images_normalized = image / 255.
@@ -21,8 +31,10 @@ def preprocess_image(image, image_size):
 
 
 class RandomHorizontalFlip(object):
-
     def __init__(self, p=0.5):
+        """
+        :param p: Probability between 0 and 1
+        """
         self.p = p
 
     def __call__(self, image_left, image_right):
@@ -34,6 +46,11 @@ class RandomHorizontalFlip(object):
 
 class RandomBrightness(object):
     def __init__(self, p=0.5, low_value=0.5, high_value=2.0):
+        """
+        :param p: Probability between 0 and 1
+        :param low_value: Minimum possible value
+        :param high_value: Maximum possible value
+        """
         self.p = p
         self.low_value = low_value
         self.high_value = high_value
@@ -48,6 +65,11 @@ class RandomBrightness(object):
 
 class RandomGamma(object):
     def __init__(self, p=0.5, low_value=0.5, high_value=2.0):
+        """
+        :param p: Probability between 0 and 1
+        :param low_value: Minimum possible value
+        :param high_value: Maximum possible value
+        """
         self.p = p
         self.low_value = low_value
         self.high_value = high_value
@@ -84,12 +106,21 @@ class DatasetBuilder(Dataset):
         return images_left, images_right
 
     def read_images(self, item):
+        """
+        :param item: Item to read
+        :return: Read images
+        """
         images_path = self.data[item]
         image_left = cv.imread(images_path[0])
         image_right = cv.imread(images_path[1])
         return image_left, image_right
 
     def augment_image(self, image_left, image_right):
+        """
+        :param image_left: Left image
+        :param image_right: Right image
+        :return: Augmented images
+        """
         image_left, image_right = RandomHorizontalFlip(p=self.augment["HorizonalFlip"]["p"])(image_left, image_right)
         image_left, image_right = RandomBrightness(p=self.augment["RandomBrightness"]["p"],
                                                    low_value=self.augment["RandomBrightness"]["low_value"],
@@ -103,6 +134,14 @@ class DatasetBuilder(Dataset):
 
 
 def create_dataloaders(data_path, image_size, batch_size, augment, logger):
+    """
+    :param data_path: Path to json file
+    :param image_size: Input size of the network
+    :param batch_size: Batch size
+    :param augment: Augmentation methods from config file
+    :param logger: print logs
+    :return:
+    """
 
     logger.info("Reading data...")
     data = DatasetBuilder(data_path, image_size, augment, logger)

@@ -3,35 +3,42 @@ import json
 import argparse
 import glob
 import random
+from tqdm import tqdm
 
 
-def get_split(image_pairs, split_percentages):
-
-    if ':' in split_percentages:
-        num_of_images = len(image_pairs)
-        sum = 0
-        for perc in split_percentages.split(':'):
-            sum += int(perc)
-        if not sum == 100:
-            print("ERROR: Sum of the split percentages is not 100")
-            exit(1)
-        if len(split_percentages.split(':')) == 3:
-            test_part = int(float(split_percentages.split(':')[2]) / 100. * num_of_images)
-            val_part = int(float(split_percentages.split(':')[1]) / 100. * num_of_images)
-            train_part = num_of_images - (test_part + val_part)
-            return [image_pairs[:train_part],
-                    image_pairs[train_part:(train_part+val_part)],
-                    image_pairs[(train_part+val_part):]]
-        elif len(split_percentages.split(':')) == 2:
-            val_part = int(float(split_percentages.split(':')[1]) / 100. * num_of_images)
-            train_part = num_of_images - val_part
-            return [image_pairs[:train_part], image_pairs[train_part:]]
-
-    elif split_percentages == "100":
-        return [image_pairs]
+def get_splits(split_percentages, all_dirs):
+    dirs_num = len(all_dirs)
+    train_dirs, val_dirs, test_dirs = 0, 0, 0
+    if len(split_percentages.split(':')) == 1:
+        train_dirs = all_dirs
+    elif len(split_percentages.split(':')) == 2:
+        train_num = int(float(split_percentages.split(':')[0]) / 100. * dirs_num)
+        train_dirs = all_dirs[:train_num]
+        val_dirs = all_dirs[train_num:]
+    elif len(split_percentages.split(':')) == 3:
+        train_num = int(float(split_percentages.split(':')[0]) / 100. * dirs_num)
+        val_num = int(float(split_percentages.split(':')[1]) / 100. * dirs_num)
+        train_dirs = all_dirs[:train_num]
+        val_dirs = all_dirs[:(train_num + val_num)]
+        test_dirs = all_dirs[(train_num + val_num):]
     else:
-        print("Invalid --split_percentages argument. See the documentation for details")
-        exit()
+        print("Invalid argument: split_percentages")
+        exit(1)
+    return train_dirs, val_dirs, test_dirs
+
+
+def generate_json(dirs, json_path):
+    image_pairs = []
+    for directory in tqdm(dirs):
+        images_02 = glob.glob(os.path.join(directory, "image_02/data/*.png"))
+        images_03 = glob.glob(os.path.join(directory, "image_03/data/*.png"))
+        images_02.sort(key=lambda x: int(x.split('/')[-1].split('.')[0]))
+        images_03.sort(key=lambda x: int(x.split('/')[-1].split('.')[0]))
+        for image2, image3 in zip(images_02, images_03):
+            image_pairs.append([image2, image3])
+    print(f"Total number of images: {len(image_pairs)}")
+    with open(json_path, 'w') as f:
+        json.dump(image_pairs, f, indent=2)
 
 
 if __name__ == "__main__":
@@ -51,49 +58,17 @@ if __name__ == "__main__":
                              "<train_percentage>:<val_percentage>:<test_percentage>")
     args = parser.parse_args()
 
-    image_pairs = []
-    all_dirs = os.listdir(args.images_path)
-    for num, directory in enumerate(all_dirs):
-        print(f"Progress: {num+1}/{len(all_dirs)} | {directory}")
-        dir_path = os.path.join(args.images_path, directory)
-        images_02 = glob.glob(os.path.join(dir_path, "*/image_02/data/*.png"))
-        images_03 = glob.glob(os.path.join(dir_path, "*/image_03/data/*.png"))
-        images_02.sort(key=lambda x: int(x.split('/')[-1].split('.')[0]))
-        images_03.sort(key=lambda x: int(x.split('/')[-1].split('.')[0]))
-        for image2, image3 in zip(images_02, images_03):
-            # image2 = image2.replace("/", "\\").replace("\\\\", "\\")
-            # image3 = image3.replace("/", "\\").replace("\\\\", "\\")
-            image_pairs.append([image2, image3])
+    print("Splitting dataset...")
+    all_dirs = glob.glob(os.path.join(args.images_path, "*/*"))
+    all_dirs = [path for path in all_dirs if os.path.isdir(path)]
+    random.shuffle(all_dirs)
+    train_dirs, val_dirs, test_dirs = get_splits(args.split_percentages, all_dirs)
 
-    random.shuffle(image_pairs)
-    splits = get_split(image_pairs, args.split_percentages)
-
-    if len(splits) == 1:
-        with open(args.train_json, 'w') as outfile:
-            json.dump(splits[0], outfile, indent=2)
-    else:
-        for num, split in enumerate(splits):
-            if num == 0:
-                if os.path.exists(args.train_json):
-                    train_file = os.path.join(args.train_json)
-                    with open(train_file, 'w') as outfile:
-                        json.dump(split, outfile, indent=2)
-                else:
-                    print("ERROR: Not provided output json file for train data")
-                    exit()
-            elif num == 1:
-                if os.path.exists(args.val_json):
-                    val_file = os.path.join(args.val_json)
-                    with open(val_file, 'w') as outfile:
-                        json.dump(split, outfile, indent=2)
-                else:
-                    print("ERROR: Not provided output json file for val data")
-                    exit()
-            else:
-                if os.path.exists(args.test_json):
-                    test_file = os.path.join(args.test_json)
-                    with open(test_file, 'w') as outfile:
-                        json.dump(split, outfile, indent=2)
-                else:
-                    print("ERROR: Not provided output json file for test data")
-                    exit()
+    print(f"Generating train dataset...\nNumber of directories: {len(train_dirs)}")
+    generate_json(train_dirs, args.train_json)
+    if val_dirs:
+        print(f"Generating val dataset...\nNumber of directories: {len(val_dirs)}")
+        generate_json(val_dirs, args.val_json)
+    if test_dirs:
+        print(f"Generating test dataset...\nNumber of directories: {len(test_dirs)}")
+        generate_json(test_dirs, args.test_json)

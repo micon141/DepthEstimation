@@ -3,6 +3,12 @@ import torch
 
 class StepDecayLR():
     def __init__(self, optimizer, lr_init, lr_end, epoch_steps):
+        """
+        :param optimizer: Optimizer
+        :param lr_init: Initial learning rate
+        :param lr_end: Final learning rate
+        :param epoch_steps: Number of epochs when learning rate will be scaled
+        """
         self.optimizer = optimizer
         self.epoch_steps = epoch_steps
         self.lr_init = lr_init
